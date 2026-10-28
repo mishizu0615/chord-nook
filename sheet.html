@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0e6e66">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Chord Nook">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>*{box-sizing:border-box}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}[hidden]{display:none!important}button{touch-action:manipulation}</style>
+<title>Chord Nook 譜面メーカー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=IBM+Plex+Mono:wght@500;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* Layout: 左=入力（パレット付き）、右=紙の譜面。スマホはタブ切替 */
+:root{
+  --bg:#eef1f4; --paper:#fbfcfd; --ink:#1b1e24; --muted:#6a7180; --line:#d8dce4;
+  --chord:#0e6e66; --chord-soft:#d9efec; --accent:#0e6e66;
+  --f-body:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Noto Sans JP",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --score-size:17px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111318; --paper:#191c22; --ink:#e7e9ee; --muted:#9097a5; --line:#2c313b;
+  --chord:#3fc1b0; --chord-soft:#173a37; --accent:#3fc1b0; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111318; --paper:#191c22; --ink:#e7e9ee; --muted:#9097a5; --line:#2c313b;
+  --chord:#3fc1b0; --chord-soft:#173a37; --accent:#3fc1b0; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.6}
+.wrap{max-width:1180px;margin:0 auto;padding-block:20px 40px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+header.top h1{font-family:"Dela Gothic One","Hiragino Sans",sans-serif;font-weight:400;font-size:22px;margin:0;letter-spacing:.02em}
+header.top h1 span{color:var(--accent)}
+header.top a.nav{margin-left:auto;font-size:13px;font-weight:700;color:var(--accent);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:4px 12px;background:var(--paper)}
+header.top p{margin:0;color:var(--muted);font-size:13px}
+.tabs{display:none;gap:4px;background:var(--line);padding:3px;border-radius:10px;margin-bottom:14px}
+.tabs button{flex:1;border:0;background:transparent;color:var(--muted);font:inherit;font-weight:700;padding:8px;border-radius:8px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--paper);color:var(--ink)}
+main{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:20px;align-items:start}
+.pane{min-width:0;display:flex;flex-direction:column;gap:12px}
+label.lbl{font-size:12px;color:var(--muted);letter-spacing:.06em;font-weight:500}
+input[type=text],textarea{width:100%;font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+input[type=text]:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:transparent}
+textarea{min-height:340px;resize:vertical;font-family:var(--f-mono);font-size:14px;line-height:1.75}
+.palette{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;flex-direction:column;align-items:center;min-width:52px;padding:5px 8px 4px;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:8px;cursor:pointer;font:inherit;line-height:1.2}
+.chip b{font-family:var(--f-mono);font-weight:600;font-size:15px;color:var(--chord)}
+.chip small{font-size:10px;color:var(--muted)}
+.chip:hover{border-color:var(--chord)}
+.chip:active{background:var(--chord-soft)}
+.chip.util b{color:var(--ink)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row input[type=text]{flex:1;min-width:0}
+.btn{font:inherit;font-weight:700;font-size:14px;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:8px;padding:8px 14px;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--paper);border-color:var(--accent)}
+.btn:focus-visible,.chip:focus-visible,.tabs button:focus-visible,.step button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.hint{font-size:12px;color:var(--muted);margin:0}
+.hint code{font-family:var(--f-mono);background:var(--chord-soft);color:var(--chord);padding:0 4px;border-radius:4px}
+.controls{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}
+.step{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:8px;background:var(--paper);overflow:hidden}
+.step span.k{font-size:12px;color:var(--muted);padding:0 4px 0 10px}
+.step output{min-width:34px;text-align:center;font-family:var(--f-mono);font-weight:600;font-variant-numeric:tabular-nums}
+.step button{border:0;background:transparent;color:var(--ink);font:inherit;font-size:18px;width:34px;height:34px;cursor:pointer}
+.step button:hover{background:var(--chord-soft)}
+.sheet{background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:28px 26px 34px;box-shadow:0 1px 0 var(--line),0 12px 30px -18px rgba(20,30,60,.25);min-width:0}
+.sheet h2{margin:0;font-size:24px;font-weight:700;text-wrap:balance}
+.meta{margin:4px 0 18px;display:flex;gap:8px;flex-wrap:wrap;font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.meta span{border:1px solid var(--line);border-radius:999px;padding:1px 9px}
+.meta span.hl{color:var(--chord);border-color:var(--chord)}
+.score{font-size:var(--score-size)}
+.score .sec{font-size:.72em;font-weight:700;letter-spacing:.12em;color:var(--muted);margin:1.4em 0 .3em;padding-bottom:2px;border-bottom:1px solid var(--line)}
+.score .sec:first-child{margin-top:0}
+.score .ln{line-height:1.5;margin:0 0 .35em;overflow-wrap:anywhere}
+.score .seg{display:inline-flex;flex-direction:column;vertical-align:bottom}
+.score .ch{font-family:var(--f-mono);font-weight:600;color:var(--chord);font-size:.82em;line-height:1.3;white-space:nowrap;padding-right:.45em}
+.score .ln.has-ch{padding-top:0}
+.score .prog{display:flex;flex-wrap:wrap;gap:0;margin:.2em 0 .6em;font-family:var(--f-mono);font-weight:600;color:var(--chord)}
+.score .prog span{min-width:4.2em;padding:.15em .6em;border-left:1.5px solid var(--line)}
+.score .prog span:last-child{border-right:1.5px solid var(--line)}
+.score .blank{height:.8em}
+.out-actions{display:flex;gap:8px;flex-wrap:wrap}
+.toast{font-size:12px;color:var(--chord);min-height:1.2em}
+#fallback{font-family:var(--f-mono);font-size:12px;min-height:160px}
+.btn[disabled]{opacity:.5;cursor:wait}
+/* 書き出し用：常にライト配色・固定幅で描画 */
+.exportbox{position:fixed;left:-10000px;top:0;width:760px;
+  --paper:#ffffff;--ink:#1b1e24;--muted:#6a7180;--line:#d8dce4;--chord:#0e6e66;--chord-soft:#d9efec;
+  color-scheme:light;color:var(--ink);background:#fff}
+.exportbox .sheet{border:0;box-shadow:none;border-radius:0;padding:40px 44px}
+@media (max-width:819px){
+  .tabs{display:flex}
+  main{grid-template-columns:minmax(0,1fr)}
+  main[data-view="edit"] #scorePane,main[data-view="score"] #editPane{display:none}
+  .sheet{padding:22px 16px 26px}
+  textarea{min-height:300px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Chord <span>Nook</span> 譜面</h1>
+    <p>歌詞に <code style="font-family:var(--f-mono)">[C]</code> を挟むだけでコード譜になる</p>
+    <a class="nav" href="./">コード辞典 →</a>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button id="tabEdit" role="tab" aria-selected="true">編集</button>
+    <button id="tabScore" role="tab" aria-selected="false">譜面</button>
+  </div>
+
+  <main id="main" data-view="edit">
+    <section class="pane" id="editPane">
+      <div>
+        <label class="lbl" for="title">曲名</label>
+        <input type="text" id="title" autocomplete="off">
+      </div>
+
+      <div>
+        <label class="lbl">タップで挿入 <span id="palKey"></span></label>
+        <div class="palette" id="palette"></div>
+      </div>
+      <div class="row">
+        <input type="text" id="custom" placeholder="その他のコード（例: Cadd9, D/F#）" autocomplete="off" autocapitalize="off">
+        <button class="btn" id="customBtn">挿入</button>
+      </div>
+
+      <div>
+        <label class="lbl" for="src">歌詞＋コード</label>
+        <textarea id="src" spellcheck="false" autocapitalize="off"></textarea>
+      </div>
+      <p class="hint"><code>[Am]</code> コード　<code># サビ</code> セクション見出し　<code>[C][G][Am][F]</code> だけの行は進行表示</p>
+    </section>
+
+    <section class="pane" id="scorePane">
+      <div class="controls">
+        <div class="step"><span class="k">移調</span><button id="tDown" aria-label="半音下げる">−</button><output id="tOut">0</output><button id="tUp" aria-label="半音上げる">＋</button></div>
+        <div class="step"><span class="k">Capo</span><button id="cDown" aria-label="カポを下げる">−</button><output id="cOut">0</output><button id="cUp" aria-label="カポを上げる">＋</button></div>
+        <div class="step"><span class="k">文字</span><button id="sDown" aria-label="文字を小さく">−</button><output id="sOut">17</output><button id="sUp" aria-label="文字を大きく">＋</button></div>
+      </div>
+
+      <article class="sheet">
+        <h2 id="sTitle"></h2>
+        <div class="meta" id="sMeta"></div>
+        <div class="score" id="score"></div>
+      </article>
+
+      <div class="out-actions" id="saveRow">
+        <button class="btn primary" id="savePdf">PDFで保存</button>
+        <button class="btn" id="savePng">画像で保存</button>
+        <button class="btn" id="saveTxt">テキストで保存</button>
+      </div>
+      <div class="out-actions">
+        <button class="btn" id="copyText">テキスト譜をコピー</button>
+        <button class="btn" id="copyPro">移調後の入力をコピー</button>
+      </div>
+      <div class="toast" id="toast" aria-live="polite"></div>
+      <textarea id="fallback" hidden readonly></textarea>
+    </section>
+  </main>
+</div>
+
+<script>
+const SH=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const FL=['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+const BASE={C:0,D:2,E:4,F:5,G:7,A:9,B:11};
+const NOTE_RE=/^([A-G])([#b♯♭]?)(.*)$/;
+const mod=n=>((n%12)+12)%12;
+const idx=(l,a)=>mod(BASE[l]+(a==='#'||a==='♯'?1:a==='b'||a==='♭'?-1:0));
+const nm=(i,flat)=>(flat?FL:SH)[mod(i)];
+const useFlat=(k,minor)=>minor?[2,7,0,5,10,3].includes(mod(k)):[5,10,3,8,1,6].includes(mod(k));
+
+function transposeChord(ch,n,flat){
+  if(!n) return ch;
+  const parts=ch.split('/');
+  const m=parts[0].match(NOTE_RE); if(!m) return ch;
+  let out=nm(idx(m[1],m[2])+n,flat)+m[3];
+  if(parts.length>1){
+    const b=parts.slice(1).join('/'); const mb=b.match(NOTE_RE);
+    out+='/'+(mb?nm(idx(mb[1],mb[2])+n,flat)+mb[3]:b);
+  }
+  return out;
+}
+const pretty=c=>c.replace(/^([A-G])#/,'$1♯').replace(/^([A-G])b/,'$1♭').replace(/\/([A-G])#/,'/$1♯').replace(/\/([A-G])b/,'/$1♭').replace(/b(?=\d)/g,'♭').replace(/#(?=\d)/g,'♯');
+
+const SAMPLE=`# イントロ
+[C][G][Am][F]
+
+# Aメロ
+[C]まだ眠る街の [G]窓をなぞって
+[Am]言えなかったこと [F]ポケットにしまう
+
+# サビ
+[F]夜が明けたら [G]君に会いに行く
+[Em]ありふれた朝を [Am]ふたりで[F]歩こう[G]`;
+
+const $=id=>document.getElementById(id);
+const st={title:'夜明けのバス停（サンプル）',text:SAMPLE,trans:0,capo:0,size:17};
+try{const s=JSON.parse(localStorage.getItem('chordnook-sheet')||'null'); if(s&&typeof s.text==='string') Object.assign(st,s);}catch(e){}
+const save=()=>{try{localStorage.setItem('chordnook-sheet',JSON.stringify(st))}catch(e){}};
+
+function srcKey(){
+  const m=st.text.match(/\[([^\]]+)\]/); if(!m) return {k:0,minor:false,found:false};
+  const c=m[1].split('/')[0].match(NOTE_RE); if(!c) return {k:0,minor:false,found:false};
+  return {k:idx(c[1],c[2]),minor:/^m(?!aj)/.test(c[3]),found:true};
+}
+function parseLine(line){
+  const segs=[]; const re=/\[([^\]]*)\]/g; let last=0,m,pend=null;
+  while((m=re.exec(line))){
+    const t=line.slice(last,m.index);
+    if(t||pend!==null) segs.push({c:pend,t});
+    pend=m[1].trim(); last=re.lastIndex;
+  }
+  const t=line.slice(last);
+  if(t||pend!==null) segs.push({c:pend,t});
+  return segs;
+}
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function render(){
+  const K=srcKey();
+  const realKey=K.k+st.trans, shapeKey=realKey-st.capo;
+  const shift=st.trans-st.capo, flat=useFlat(shapeKey,K.minor);
+  const conv=c=>transposeChord(c,shift,flat);
+
+  $('sTitle').textContent=st.title||'無題';
+  const kn=(k)=>nm(k,useFlat(k,K.minor))+(K.minor?'m':'');
+  let meta='';
+  if(K.found){
+    meta+=`<span class="hl">Key ${pretty(kn(realKey))}</span>`;
+    if(st.capo) meta+=`<span>Capo ${st.capo}</span><span>${pretty(kn(shapeKey))}フォーム</span>`;
+    if(st.trans) meta+=`<span>原曲 ${pretty(kn(K.k))} から ${st.trans>0?'+':''}${st.trans}</span>`;
+  }
+  $('sMeta').innerHTML=meta;
+
+  let html='';
+  for(const raw of st.text.split('\n')){
+    const line=raw.replace(/\s+$/,'');
+    if(!line){html+='<div class="blank"></div>';continue}
+    if(/^#\s*/.test(line)){html+=`<div class="sec">${esc(line.replace(/^#\s*/,''))}</div>`;continue}
+    const segs=parseLine(line);
+    const hasCh=segs.some(s=>s.c!==null);
+    if(hasCh&&segs.every(s=>!s.t.trim())){
+      html+='<div class="prog">'+segs.filter(s=>s.c).map(s=>`<span>${esc(pretty(conv(s.c)))}</span>`).join('')+'</div>';continue;
+    }
+    let l=`<div class="ln${hasCh?' has-ch':''}">`;
+    for(const s of segs){
+      if(s.c===null){l+=esc(s.t);continue}
+      // コードの直後の言葉（空白まで・最大10文字）をコードと一緒に固めて、字間が空かんようにする
+      const chars=Array.from(s.t); let n=0;
+      while(n<chars.length&&n<10&&!/\s/.test(chars[n])) n++;
+      const head=chars.slice(0,n).join(''), rest=chars.slice(n).join('');
+      l+=`<span class="seg"><span class="ch">${esc(pretty(conv(s.c)))}</span><span>${head?esc(head):'&nbsp;'}</span></span>${esc(rest)}`;
+    }
+    html+=l+'</div>';
+  }
+  $('score').innerHTML=html;
+  $('tOut').textContent=(st.trans>0?'+':'')+st.trans;
+  $('cOut').textContent=st.capo;
+  $('sOut').textContent=st.size;
+  document.documentElement.style.setProperty('--score-size',st.size+'px');
+  renderPalette(K);
+  save();
+}
+
+function renderPalette(K){
+  const k=K.k, f=useFlat(k,K.minor);
+  const set=K.minor
+    ?[[0,'m','Ⅰm'],[2,'m7-5','Ⅱm7-5'],[3,'','♭Ⅲ'],[5,'m','Ⅳm'],[7,'m','Ⅴm'],[7,'7','Ⅴ7'],[8,'','♭Ⅵ'],[10,'','♭Ⅶ']]
+    :[[0,'','Ⅰ'],[2,'m','Ⅱm'],[4,'m','Ⅲm'],[5,'','Ⅳ'],[7,'','Ⅴ'],[9,'m','Ⅵm'],[7,'7','Ⅴ7'],[5,'M7','ⅣM7']];
+  const key=pretty(nm(k,f)+(K.minor?'m':''));
+  $('palKey').textContent=K.found?`（Key ${key} のダイアトニック）`:'（最初のコードからキーを判定）';
+  const sig=key+'|'+K.minor;
+  if($('palette').dataset.sig===sig) return;
+  $('palette').dataset.sig=sig;
+  $('palette').innerHTML=set.map(([o,q,d])=>{const c=nm(k+o,f)+q;return `<button class="chip" data-ins="[${c}]"><b>${pretty(c)}</b><small>${d}</small></button>`}).join('')
+    +`<button class="chip util" data-ins="\n# "><b>#</b><small>見出し</small></button>`;
+}
+
+// caret-safe insert
+const ta=$('src'); let caret=null;
+const keep=()=>{caret=[ta.selectionStart,ta.selectionEnd]};
+['keyup','click','select','input','blur'].forEach(e=>ta.addEventListener(e,keep));
+function insert(str){
+  const [a,b]=caret||[ta.value.length,ta.value.length];
+  ta.value=ta.value.slice(0,a)+str+ta.value.slice(b);
+  const p=a+str.length; caret=[p,p];
+  st.text=ta.value; render();
+  try{ta.focus({preventScroll:true}); ta.setSelectionRange(p,p);}catch(e){}
+}
+$('palette').addEventListener('pointerdown',e=>{if(e.target.closest('.chip')) e.preventDefault()});
+$('palette').addEventListener('click',e=>{const b=e.target.closest('.chip'); if(b) insert(b.dataset.ins)});
+$('customBtn').addEventListener('click',()=>{const v=$('custom').value.trim(); if(!v) return; insert(`[${v.replace(/[\[\]]/g,'')}]`); $('custom').value='';});
+$('custom').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('customBtn').click()}});
+
+ta.addEventListener('input',()=>{st.text=ta.value;render()});
+$('title').addEventListener('input',e=>{st.title=e.target.value;render()});
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+$('tUp').onclick=()=>{st.trans=clamp(st.trans+1,-11,11);render()};
+$('tDown').onclick=()=>{st.trans=clamp(st.trans-1,-11,11);render()};
+$('cUp').onclick=()=>{st.capo=clamp(st.capo+1,0,9);render()};
+$('cDown').onclick=()=>{st.capo=clamp(st.capo-1,0,9);render()};
+$('sUp').onclick=()=>{st.size=clamp(st.size+1,12,30);render()};
+$('sDown').onclick=()=>{st.size=clamp(st.size-1,12,30);render()};
+
+function setView(v){$('main').dataset.view=v;$('tabEdit').setAttribute('aria-selected',v==='edit');$('tabScore').setAttribute('aria-selected',v==='score')}
+$('tabEdit').onclick=()=>setView('edit'); $('tabScore').onclick=()=>setView('score');
+
+// text export (chord-over-lyric, 全角=2幅で揃える)
+const w=ch=>/[ᄀ-ᅟ⺀-꓏가-힣豈-﫿︰-﹏＀-｠￠-￦]/.test(ch)?2:1;
+const width=s=>Array.from(s).reduce((n,c)=>n+w(c),0);
+function exportText(){
+  const K=srcKey(), shift=st.trans-st.capo, shapeKey=K.k+shift, flat=useFlat(shapeKey,K.minor);
+  const conv=c=>transposeChord(c,shift,flat);
+  const out=[st.title||'無題'];
+  if(K.found){const kn=k=>nm(k,useFlat(k,K.minor))+(K.minor?'m':''); let m='Key '+kn(K.k+st.trans); if(st.capo) m+=` / Capo ${st.capo}（${kn(shapeKey)}フォーム）`; out.push(m);}
+  out.push('');
+  for(const raw of st.text.split('\n')){
+    const line=raw.replace(/\s+$/,'');
+    if(!line){out.push('');continue}
+    if(/^#/.test(line)){out.push('【'+line.replace(/^#\s*/,'')+'】');continue}
+    const segs=parseLine(line);
+    if(segs.some(s=>s.c!==null)&&segs.every(s=>!s.t.trim())){out.push('| '+segs.filter(s=>s.c).map(s=>conv(s.c)).join(' | ')+' |');continue}
+    let cl='',ly='';
+    for(const s of segs){
+      if(s.c!==null){
+        const c=conv(s.c);
+        if(cl.length>width(ly)) ly+=' '.repeat(cl.length-width(ly));
+        cl+=' '.repeat(Math.max(0,width(ly)-cl.length))+c+' ';
+      }
+      ly+=s.t;
+    }
+    if(cl.trim()) out.push(cl.replace(/\s+$/,''));
+    out.push(ly);
+  }
+  return out.join('\n');
+}
+function exportPro(){
+  const K=srcKey(), flat=useFlat(K.k+st.trans,K.minor);
+  return st.text.replace(/\[([^\]]+)\]/g,(_,c)=>'['+transposeChord(c.trim(),st.trans,flat)+']');
+}
+async function copy(txt,label){
+  try{await navigator.clipboard.writeText(txt);$('fallback').hidden=true;$('toast').textContent=label+'をコピーした';}
+  catch(e){const f=$('fallback');f.hidden=false;f.value=txt;f.focus();f.select();$('toast').textContent='自動コピーできんかったので、下の枠を長押しでコピーしてね';}
+}
+$('copyText').onclick=()=>copy(exportText(),'テキスト譜');
+$('copyPro').onclick=()=>copy(exportPro(),'移調後の入力');
+
+// ---- 保存（PDF / 画像 / テキスト）----
+const libs={};
+function loadScript(src){return libs[src]||(libs[src]=new Promise((ok,ng)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{delete libs[src];ng(new Error('load'))};document.head.appendChild(s)}))}
+const H2C='vendor/html2canvas.min.js';
+const JSPDF='vendor/jspdf.umd.min.js';
+const fname=ext=>((st.title||'コード譜').replace(/[\\/:*?"<>|]/g,'').trim()||'コード譜')+'.'+ext;
+
+async function capture(){
+  await loadScript(H2C);
+  try{await document.fonts.ready}catch(e){}
+  const box=document.createElement('div'); box.className='exportbox';
+  box.style.setProperty('--score-size',st.size+'px');
+  box.appendChild(document.querySelector('#scorePane .sheet').cloneNode(true));
+  document.body.appendChild(box);
+  const sheet=box.firstChild;
+  const items=[...sheet.querySelectorAll('.score > *')].map(el=>({top:el.offsetTop,bottom:el.offsetTop+el.offsetHeight}));
+  const cssW=sheet.offsetWidth, cssH=sheet.offsetHeight;
+  try{
+    const canvas=await html2canvas(sheet,{scale:2,backgroundColor:'#ffffff',logging:false});
+    return {canvas,items,cssW,cssH};
+  }finally{box.remove()}
+}
+const toBlob=(c,type)=>new Promise(r=>c.toBlob(r,type,0.92));
+
+const MIME={pdf:'application/pdf',png:'image/png',txt:'text/plain'};
+const isTouch=matchMedia('(pointer:coarse)').matches;
+async function saveFile(data,name,kind){
+  const blob=data instanceof Blob?data:new Blob([data],{type:MIME[kind]+';charset=utf-8'});
+  const file=new File([blob],name,{type:MIME[kind]});
+  // スマホは共有シート（ファイルに保存・LINEなど）、PCは普通にダウンロード
+  if(isTouch&&navigator.canShare&&navigator.canShare({files:[file]})){
+    await navigator.share({files:[file],title:name});
+    return 'shared';
+  }
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),4000);
+  return 'saved';
+}
+async function doSave(kind,btn){
+  btn.disabled=true; $('toast').textContent='作成中…';
+  try{
+    let data,name;
+    if(kind==='txt'){data=exportText();name=fname('txt');}
+    else{
+      const {canvas,items,cssW,cssH}=await capture();
+      if(kind==='png'){data=await toBlob(canvas,'image/png');name=fname('png');}
+      else{
+        await loadScript(JSPDF);
+        const {jsPDF}=window.jspdf;
+        const pdf=new jsPDF({unit:'mm',format:'a4',orientation:'portrait'});
+        const M=12, W=210-M*2, PH=297-M*2;
+        const pagePx=PH/W*cssW, k=canvas.width/cssW;
+        // 行の途中で切れないよう改ページ位置を決める
+        const breaks=[0]; let start=0, lastBottom=0;
+        for(const it of items){
+          if(it.bottom-start>pagePx && lastBottom>start){start=lastBottom;breaks.push(start)}
+          lastBottom=it.bottom;
+        }
+        breaks.push(cssH);
+        for(let i=0;i<breaks.length-1;i++){
+          let a=breaks[i], b=Math.min(breaks[i+1], a+pagePx);
+          const c=document.createElement('canvas');
+          c.width=canvas.width; c.height=Math.max(1,Math.round((b-a)*k));
+          const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height);
+          g.drawImage(canvas,0,Math.round(a*k),c.width,c.height,0,0,c.width,c.height);
+          if(i) pdf.addPage();
+          pdf.addImage(c.toDataURL('image/jpeg',0.92),'JPEG',M,M,W,(b-a)/cssW*W);
+        }
+        data=pdf.output('blob'); name=fname('pdf');
+      }
+    }
+    const r=await saveFile(data,name,kind);
+    $('toast').textContent=r==='shared'?name+' を書き出した':name+' を保存した';
+  }catch(e){
+    $('toast').textContent=e&&e.name==='AbortError'?'書き出しをキャンセルした'
+      :e&&e.message==='load'?'部品の読み込みに失敗した。通信を確認してもう一回押してね'
+      :'保存できんかった。テキスト譜のコピーを使うてね';
+  }finally{btn.disabled=false}
+}
+$('savePdf').onclick=e=>doSave('pdf',e.currentTarget);
+$('savePng').onclick=e=>doSave('png',e.currentTarget);
+$('saveTxt').onclick=e=>doSave('txt',e.currentTarget);
+
+$('title').value=st.title; ta.value=st.text;
+render();
+if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
+</script>
+</body>
+</html>
