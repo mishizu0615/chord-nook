@@ -57,6 +57,7 @@ textarea{min-height:340px;resize:vertical;font-family:var(--f-mono);font-size:14
 .chip.sec b{color:var(--ink);font-family:var(--f-body);font-weight:700;font-size:14px}
 .keyrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .keyrow .lbl{margin-right:2px}
+.keynote{font-size:12px;color:var(--chord);font-weight:700}
 select{font:inherit;font-family:var(--f-mono);font-weight:600;font-size:15px;color:var(--chord);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:6px 10px;min-width:84px}
 select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .seg2{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--paper)}
@@ -141,6 +142,8 @@ select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
         <div class="seg2" role="group" aria-label="メジャー／マイナー">
           <button id="kMaj" aria-pressed="true">メジャー</button><button id="kMin" aria-pressed="false">マイナー</button>
         </div>
+        <div class="step"><span class="k">入力カポ</span><button id="iDown" aria-label="入力カポを下げる">−</button><output id="iOut">0</output><button id="iUp" aria-label="入力カポを上げる">＋</button></div>
+        <span class="keynote" id="keyNote"></span>
       </div>
       <div>
         <div class="ptabs" role="tablist" id="ptabs">
@@ -160,7 +163,7 @@ select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
         <label class="lbl" for="src">歌詞＋コード</label>
         <textarea id="src" spellcheck="false" autocapitalize="off"></textarea>
       </div>
-      <p class="hint"><code>[Am]</code> コード　<code># サビ</code> 構成の見出し（「構成」タブから挿入）　<code>[C][G][Am][F]</code> だけの行は進行表示</p>
+      <p class="hint"><code>[Am]</code> コード　<code># サビ</code> 構成の見出し（「構成」タブから挿入）　<code>[C][G][Am][F]</code> だけの行は進行表示<br>カポを付けて弾く形で入力するときは「入力カポ」を合わせると、譜面は実音のコードで出る</p>
     </section>
 
     <section class="pane" id="scorePane">
@@ -184,7 +187,7 @@ select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
       <div class="out-actions">
         <button class="btn" id="copyText">テキスト譜をコピー</button>
         <button class="btn" id="copySuno">Suno用にコピー</button>
-        <button class="btn" id="copyPro">移調後の入力をコピー</button>
+        <button class="btn" id="copyPro">実音の入力をコピー</button>
       </div>
       <div class="toast" id="toast" aria-live="polite"></div>
       <textarea id="fallback" hidden readonly></textarea>
@@ -238,6 +241,7 @@ function detectKey(){
 }
 if(typeof st.key!=='number'){const d=detectKey(); st.key=d.k; st.minor=d.minor;}
 if(!st.ptab) st.ptab='dia';
+if(typeof st.inCapo!=='number') st.inCapo=0;
 const srcKey=()=>({k:st.key,minor:!!st.minor,found:true});
 function parseLine(line){
   const segs=[]; const re=/\[([^\]]*)\]/g; let last=0,m,pend=null;
@@ -254,8 +258,9 @@ const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&qu
 
 function render(){
   const K=srcKey();
-  const realKey=K.k+st.trans, shapeKey=realKey-st.capo;
-  const shift=st.trans-st.capo, flat=useFlat(shapeKey,K.minor);
+  const ic=st.inCapo, origKey=K.k+ic;
+  const realKey=origKey+st.trans, shapeKey=realKey-st.capo;
+  const shift=ic+st.trans-st.capo, flat=useFlat(shapeKey,K.minor);
   const conv=c=>transposeChord(c,shift,flat);
 
   $('sTitle').textContent=st.title||'無題';
@@ -264,7 +269,7 @@ function render(){
   if(K.found){
     meta+=`<span class="hl">Key ${pretty(kn(realKey))}</span>`;
     if(st.capo) meta+=`<span>Capo ${st.capo}</span><span>${pretty(kn(shapeKey))}フォーム</span>`;
-    if(st.trans) meta+=`<span>原曲 ${pretty(kn(K.k))} から ${st.trans>0?'+':''}${st.trans}</span>`;
+    if(st.trans) meta+=`<span>原曲 ${pretty(kn(origKey))} から ${st.trans>0?'+':''}${st.trans}</span>`;
   }
   $('sMeta').innerHTML=meta;
 
@@ -293,6 +298,8 @@ function render(){
   $('tOut').textContent=(st.trans>0?'+':'')+st.trans;
   $('cOut').textContent=st.capo;
   $('sOut').textContent=st.size;
+  $('iOut').textContent=ic;
+  $('keyNote').textContent=ic?`→ 実音 ${pretty(kn(origKey))} で表示`:'';
   document.documentElement.style.setProperty('--score-size',st.size+'px');
   renderPalette(K);
   save();
@@ -377,6 +384,8 @@ $('tUp').onclick=()=>{st.trans=clamp(st.trans+1,-11,11);render()};
 $('tDown').onclick=()=>{st.trans=clamp(st.trans-1,-11,11);render()};
 $('cUp').onclick=()=>{st.capo=clamp(st.capo+1,0,9);render()};
 $('cDown').onclick=()=>{st.capo=clamp(st.capo-1,0,9);render()};
+$('iUp').onclick=()=>{st.inCapo=clamp(st.inCapo+1,0,9);render()};
+$('iDown').onclick=()=>{st.inCapo=clamp(st.inCapo-1,0,9);render()};
 $('sUp').onclick=()=>{st.size=clamp(st.size+1,12,30);render()};
 $('sDown').onclick=()=>{st.size=clamp(st.size-1,12,30);render()};
 
@@ -387,10 +396,10 @@ $('tabEdit').onclick=()=>setView('edit'); $('tabScore').onclick=()=>setView('sco
 const w=ch=>/[ᄀ-ᅟ⺀-꓏가-힣豈-﫿︰-﹏＀-｠￠-￦]/.test(ch)?2:1;
 const width=s=>Array.from(s).reduce((n,c)=>n+w(c),0);
 function exportText(){
-  const K=srcKey(), shift=st.trans-st.capo, shapeKey=K.k+shift, flat=useFlat(shapeKey,K.minor);
+  const K=srcKey(), shift=st.inCapo+st.trans-st.capo, shapeKey=K.k+shift, flat=useFlat(shapeKey,K.minor);
   const conv=c=>transposeChord(c,shift,flat);
   const out=[st.title||'無題'];
-  if(K.found){const kn=k=>nm(k,useFlat(k,K.minor))+(K.minor?'m':''); let m='Key '+kn(K.k+st.trans); if(st.capo) m+=` / Capo ${st.capo}（${kn(shapeKey)}フォーム）`; out.push(m);}
+  if(K.found){const kn=k=>nm(k,useFlat(k,K.minor))+(K.minor?'m':''); let m='Key '+kn(K.k+st.inCapo+st.trans); if(st.capo) m+=` / Capo ${st.capo}（${kn(shapeKey)}フォーム）`; out.push(m);}
   out.push('');
   for(const raw of st.text.split('\n')){
     const line=raw.replace(/\s+$/,'');
@@ -413,15 +422,15 @@ function exportText(){
   return out.join('\n');
 }
 function exportPro(){
-  const K=srcKey(), flat=useFlat(K.k+st.trans,K.minor);
-  return st.text.replace(/\[([^\]]+)\]/g,(_,c)=>'['+transposeChord(c.trim(),st.trans,flat)+']');
+  const K=srcKey(), n=st.inCapo+st.trans, flat=useFlat(K.k+n,K.minor);
+  return st.text.replace(/\[([^\]]+)\]/g,(_,c)=>'['+transposeChord(c.trim(),n,flat)+']');
 }
 async function copy(txt,label){
   try{await navigator.clipboard.writeText(txt);$('fallback').hidden=true;$('toast').textContent=label+'をコピーした';}
   catch(e){const f=$('fallback');f.hidden=false;f.value=txt;f.focus();f.select();$('toast').textContent='自動コピーできんかったので、下の枠を長押しでコピーしてね';}
 }
 $('copyText').onclick=()=>copy(exportText(),'テキスト譜');
-$('copyPro').onclick=()=>copy(exportPro(),'移調後の入力');
+$('copyPro').onclick=()=>copy(exportPro(),'実音の入力');
 
 // Suno用: 見出しを英語タグに変換、コードを外して歌詞だけにする
 function sunoTag(h){
