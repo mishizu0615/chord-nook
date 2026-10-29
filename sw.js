@@ -1,5 +1,5 @@
-const CACHE='chordnook-v6';
-const ASSETS=['./','./index.html','./manifest.json','./icon-192.png','./icon-512.png','./apple-touch-icon.png','./sheet.html','./vendor/html2canvas.min.js','./vendor/jspdf.umd.min.js'];
+const CACHE='chordnook-v7';
+const ASSETS=['./','./index.html','./manifest.json','./icon-192.png','./icon-512.png','./apple-touch-icon.png','./sheet.html','./manifest-sheet.json','./icon-sheet-192.png','./icon-sheet-512.png','./apple-touch-icon-sheet.png','./vendor/html2canvas.min.js','./vendor/jspdf.umd.min.js'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)));self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));self.clients.claim()});
 self.addEventListener('fetch',e=>{
