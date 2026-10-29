@@ -54,7 +54,18 @@ textarea{min-height:340px;resize:vertical;font-family:var(--f-mono);font-size:14
 .chip small{font-size:10px;color:var(--muted)}
 .chip:hover{border-color:var(--chord)}
 .chip:active{background:var(--chord-soft)}
-.chip.util b{color:var(--ink)}
+.chip.sec b{color:var(--ink);font-family:var(--f-body);font-weight:700;font-size:14px}
+.keyrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.keyrow .lbl{margin-right:2px}
+select{font:inherit;font-family:var(--f-mono);font-weight:600;font-size:15px;color:var(--chord);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:6px 10px;min-width:84px}
+select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.seg2{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--paper)}
+.seg2 button{border:0;background:transparent;color:var(--muted);font:inherit;font-size:13px;font-weight:700;padding:6px 12px;cursor:pointer}
+.seg2 button[aria-pressed="true"]{background:var(--chord);color:var(--paper)}
+.ptabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:8px;overflow-x:auto}
+.ptabs button{border:0;background:transparent;color:var(--muted);font:inherit;font-size:13px;font-weight:700;padding:6px 10px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
+.ptabs button[aria-selected="true"]{color:var(--chord);border-bottom-color:var(--chord)}
+.seg2 button:focus-visible,.ptabs button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .row input[type=text]{flex:1;min-width:0}
 .btn{font:inherit;font-weight:700;font-size:14px;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:8px;padding:8px 14px;cursor:pointer}
@@ -124,8 +135,20 @@ textarea{min-height:340px;resize:vertical;font-family:var(--f-mono);font-size:14
         <input type="text" id="title" autocomplete="off">
       </div>
 
+      <div class="keyrow">
+        <label class="lbl" for="keyRoot">キー</label>
+        <select id="keyRoot"></select>
+        <div class="seg2" role="group" aria-label="メジャー／マイナー">
+          <button id="kMaj" aria-pressed="true">メジャー</button><button id="kMin" aria-pressed="false">マイナー</button>
+        </div>
+      </div>
       <div>
-        <label class="lbl">タップで挿入 <span id="palKey"></span></label>
+        <div class="ptabs" role="tablist" id="ptabs">
+          <button role="tab" data-g="dia">ダイアトニック</button>
+          <button role="tab" data-g="sev">セブンス</button>
+          <button role="tab" data-g="ext">よく使う</button>
+          <button role="tab" data-g="sec">構成</button>
+        </div>
         <div class="palette" id="palette"></div>
       </div>
       <div class="row">
@@ -137,7 +160,7 @@ textarea{min-height:340px;resize:vertical;font-family:var(--f-mono);font-size:14
         <label class="lbl" for="src">歌詞＋コード</label>
         <textarea id="src" spellcheck="false" autocapitalize="off"></textarea>
       </div>
-      <p class="hint"><code>[Am]</code> コード　<code># サビ</code> セクション見出し　<code>[C][G][Am][F]</code> だけの行は進行表示</p>
+      <p class="hint"><code>[Am]</code> コード　<code># サビ</code> 構成の見出し（「構成」タブから挿入）　<code>[C][G][Am][F]</code> だけの行は進行表示</p>
     </section>
 
     <section class="pane" id="scorePane">
@@ -160,6 +183,7 @@ textarea{min-height:340px;resize:vertical;font-family:var(--f-mono);font-size:14
       </div>
       <div class="out-actions">
         <button class="btn" id="copyText">テキスト譜をコピー</button>
+        <button class="btn" id="copySuno">Suno用にコピー</button>
         <button class="btn" id="copyPro">移調後の入力をコピー</button>
       </div>
       <div class="toast" id="toast" aria-live="polite"></div>
@@ -176,7 +200,7 @@ const NOTE_RE=/^([A-G])([#b♯♭]?)(.*)$/;
 const mod=n=>((n%12)+12)%12;
 const idx=(l,a)=>mod(BASE[l]+(a==='#'||a==='♯'?1:a==='b'||a==='♭'?-1:0));
 const nm=(i,flat)=>(flat?FL:SH)[mod(i)];
-const useFlat=(k,minor)=>minor?[2,7,0,5,10,3].includes(mod(k)):[5,10,3,8,1,6].includes(mod(k));
+const useFlat=(k,minor)=>minor?[2,7,0,5,10,3].includes(mod(k)):[5,10,3,8,1].includes(mod(k));
 
 function transposeChord(ch,n,flat){
   if(!n) return ch;
@@ -207,11 +231,14 @@ const st={title:'夜明けのバス停（サンプル）',text:SAMPLE,trans:0,ca
 try{const s=JSON.parse(localStorage.getItem('chordnook-sheet')||'null'); if(s&&typeof s.text==='string') Object.assign(st,s);}catch(e){}
 const save=()=>{try{localStorage.setItem('chordnook-sheet',JSON.stringify(st))}catch(e){}};
 
-function srcKey(){
-  const m=st.text.match(/\[([^\]]+)\]/); if(!m) return {k:0,minor:false,found:false};
-  const c=m[1].split('/')[0].match(NOTE_RE); if(!c) return {k:0,minor:false,found:false};
-  return {k:idx(c[1],c[2]),minor:/^m(?!aj)/.test(c[3]),found:true};
+function detectKey(){
+  const m=st.text.match(/\[([^\]]+)\]/); if(!m) return {k:0,minor:false};
+  const c=m[1].split('/')[0].match(NOTE_RE); if(!c) return {k:0,minor:false};
+  return {k:idx(c[1],c[2]),minor:/^m(?!aj)/.test(c[3])};
 }
+if(typeof st.key!=='number'){const d=detectKey(); st.key=d.k; st.minor=d.minor;}
+if(!st.ptab) st.ptab='dia';
+const srcKey=()=>({k:st.key,minor:!!st.minor,found:true});
 function parseLine(line){
   const segs=[]; const re=/\[([^\]]*)\]/g; let last=0,m,pend=null;
   while((m=re.exec(line))){
@@ -271,18 +298,48 @@ function render(){
   save();
 }
 
+// [度数オフセット, 種類, ベース音オフセット, ♭表記を強制, 度数表示]
+const PAL={
+  maj:{
+    dia:[[0,'',null,0,'Ⅰ'],[2,'m',null,0,'Ⅱm'],[4,'m',null,0,'Ⅲm'],[5,'',null,0,'Ⅳ'],[7,'',null,0,'Ⅴ'],[9,'m',null,0,'Ⅵm'],[11,'m-5',null,0,'Ⅶm-5']],
+    sev:[[0,'M7',null,0,'ⅠM7'],[2,'m7',null,0,'Ⅱm7'],[4,'m7',null,0,'Ⅲm7'],[5,'M7',null,0,'ⅣM7'],[7,'7',null,0,'Ⅴ7'],[9,'m7',null,0,'Ⅵm7'],[11,'m7-5',null,0,'Ⅶm7-5']],
+    ext:[[7,'sus4',null,0,'Ⅴsus4'],[0,'add9',null,0,'Ⅰadd9'],[0,'',4,0,'Ⅰ/Ⅲ'],[7,'',11,0,'Ⅴ/Ⅶ'],[5,'',7,0,'Ⅳ/Ⅴ'],
+         [4,'7',null,0,'Ⅲ7'],[9,'7',null,0,'Ⅵ7'],[2,'7',null,0,'Ⅱ7'],[0,'7',null,0,'Ⅰ7'],
+         [5,'m',null,0,'Ⅳm'],[6,'m7-5',null,0,'♯Ⅳm7-5'],[8,'',null,1,'♭Ⅵ'],[10,'',null,1,'♭Ⅶ']]
+  },
+  min:{
+    dia:[[0,'m',null,0,'Ⅰm'],[2,'m-5',null,0,'Ⅱm-5'],[3,'',null,0,'♭Ⅲ'],[5,'m',null,0,'Ⅳm'],[7,'m',null,0,'Ⅴm'],[8,'',null,0,'♭Ⅵ'],[10,'',null,0,'♭Ⅶ']],
+    sev:[[0,'m7',null,0,'Ⅰm7'],[2,'m7-5',null,0,'Ⅱm7-5'],[3,'M7',null,0,'♭ⅢM7'],[5,'m7',null,0,'Ⅳm7'],[7,'m7',null,0,'Ⅴm7'],[8,'M7',null,0,'♭ⅥM7'],[10,'7',null,0,'♭Ⅶ7']],
+    ext:[[7,'',null,0,'Ⅴ'],[7,'7',null,0,'Ⅴ7'],[7,'sus4',null,0,'Ⅴsus4'],[7,'',11,0,'Ⅴ/Ⅶ'],[5,'',null,0,'Ⅳ'],[2,'m7',null,0,'Ⅱm7'],
+         [0,'m',10,0,'Ⅰm/♭Ⅶ'],[0,'m(add9)',null,0,'Ⅰm(add9)'],[10,'',0,0,'♭Ⅶ/Ⅰ'],[1,'',null,1,'♭Ⅱ']]
+  }
+};
+const SECTIONS=[['イントロ','Intro'],['Aメロ','Verse'],['Bメロ','Pre-Chorus'],['サビ','Chorus'],['間奏','Interlude'],['Cメロ','Bridge'],['落ちサビ','Soft Chorus'],['大サビ','Final Chorus'],['ギターソロ','Guitar Solo'],['アウトロ','Outro']];
+const SUNO=Object.fromEntries(SECTIONS.map(([j,e])=>[j.normalize('NFKC').toLowerCase(),e]));
+Object.assign(SUNO,{'ソロ':'Guitar Solo','間奏ソロ':'Guitar Solo','エンディング':'Outro','前奏':'Intro','dメロ':'Bridge','ラストサビ':'Final Chorus'});
+
+function chordName(k,f,[o,q,b,ff]){
+  const fl=ff?true:f;
+  return nm(k+o,fl)+q+(b===null?'':'/'+nm(k+b,fl));
+}
+function renderKeyUI(){
+  const sel=$('keyRoot'), minor=!!st.minor;
+  sel.innerHTML=Array.from({length:12},(_,i)=>`<option value="${i}">${pretty(nm(i,useFlat(i,minor))+(minor?'m':''))}</option>`).join('');
+  sel.value=String(st.key);
+  $('kMaj').setAttribute('aria-pressed',!minor); $('kMin').setAttribute('aria-pressed',minor);
+}
 function renderPalette(K){
-  const k=K.k, f=useFlat(k,K.minor);
-  const set=K.minor
-    ?[[0,'m','Ⅰm'],[2,'m7-5','Ⅱm7-5'],[3,'','♭Ⅲ'],[5,'m','Ⅳm'],[7,'m','Ⅴm'],[7,'7','Ⅴ7'],[8,'','♭Ⅵ'],[10,'','♭Ⅶ']]
-    :[[0,'','Ⅰ'],[2,'m','Ⅱm'],[4,'m','Ⅲm'],[5,'','Ⅳ'],[7,'','Ⅴ'],[9,'m','Ⅵm'],[7,'7','Ⅴ7'],[5,'M7','ⅣM7']];
-  const key=pretty(nm(k,f)+(K.minor?'m':''));
-  $('palKey').textContent=K.found?`（Key ${key} のダイアトニック）`:'（最初のコードからキーを判定）';
-  const sig=key+'|'+K.minor;
+  const k=K.k, f=useFlat(k,K.minor), g=st.ptab;
+  const sig=k+'|'+K.minor+'|'+g;
   if($('palette').dataset.sig===sig) return;
   $('palette').dataset.sig=sig;
-  $('palette').innerHTML=set.map(([o,q,d])=>{const c=nm(k+o,f)+q;return `<button class="chip" data-ins="[${c}]"><b>${pretty(c)}</b><small>${d}</small></button>`}).join('')
-    +`<button class="chip util" data-ins="\n# "><b>#</b><small>見出し</small></button>`;
+  document.querySelectorAll('#ptabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.g===g));
+  if(g==='sec'){
+    $('palette').innerHTML=SECTIONS.map(([j,e])=>`<button class="chip sec" data-sec="${j}"><b>${j}</b><small>${e}</small></button>`).join('');
+    return;
+  }
+  const set=PAL[K.minor?'min':'maj'][g];
+  $('palette').innerHTML=set.map(spec=>{const c=chordName(k,f,spec);return `<button class="chip" data-ins="[${esc(c)}]"><b>${esc(pretty(c))}</b><small>${spec[4]}</small></button>`}).join('');
 }
 
 // caret-safe insert
@@ -297,7 +354,19 @@ function insert(str){
   try{ta.focus({preventScroll:true}); ta.setSelectionRange(p,p);}catch(e){}
 }
 $('palette').addEventListener('pointerdown',e=>{if(e.target.closest('.chip')) e.preventDefault()});
-$('palette').addEventListener('click',e=>{const b=e.target.closest('.chip'); if(b) insert(b.dataset.ins)});
+$('palette').addEventListener('click',e=>{
+  const b=e.target.closest('.chip'); if(!b) return;
+  if(b.dataset.sec){
+    // 見出しは必ず行頭に。前のセクションとの間に空行を1つ入れる
+    const a=(caret||[ta.value.length])[0], before=ta.value.slice(0,a);
+    const pre=before===''||before.endsWith('\n\n')?'':before.endsWith('\n')?'\n':'\n\n';
+    insert(pre+'# '+b.dataset.sec+'\n');
+  } else insert(b.dataset.ins);
+});
+$('ptabs').addEventListener('click',e=>{const b=e.target.closest('button'); if(!b) return; st.ptab=b.dataset.g; render();});
+$('keyRoot').addEventListener('change',e=>{st.key=+e.target.value; render();});
+$('kMaj').onclick=()=>{st.minor=false; renderKeyUI(); render();};
+$('kMin').onclick=()=>{st.minor=true; renderKeyUI(); render();};
 $('customBtn').addEventListener('click',()=>{const v=$('custom').value.trim(); if(!v) return; insert(`[${v.replace(/[\[\]]/g,'')}]`); $('custom').value='';});
 $('custom').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('customBtn').click()}});
 
@@ -353,6 +422,33 @@ async function copy(txt,label){
 }
 $('copyText').onclick=()=>copy(exportText(),'テキスト譜');
 $('copyPro').onclick=()=>copy(exportPro(),'移調後の入力');
+
+// Suno用: 見出しを英語タグに変換、コードを外して歌詞だけにする
+function sunoTag(h){
+  const key=h.normalize('NFKC').toLowerCase().replace(/[0-9\s]|番|コーラス$/g,'');
+  return SUNO[key]||h.trim();
+}
+function exportSuno(){
+  const lines=st.text.split('\n');
+  const verseTotal=lines.filter(l=>/^#/.test(l)&&sunoTag(l.replace(/^#\s*/,''))==='Verse').length;
+  let vn=0; const out=[];
+  for(const raw of lines){
+    const line=raw.replace(/\s+$/,'');
+    if(/^#/.test(line)){
+      let t=sunoTag(line.replace(/^#\s*/,''));
+      if(t==='Verse'&&verseTotal>1) t='Verse '+(++vn);
+      if(out.length&&out[out.length-1]!=='') out.push('');
+      out.push('['+t+']'); continue;
+    }
+    const lyric=line.replace(/\[[^\]]*\]/g,'').replace(/\s{2,}/g,' ').trim();
+    if(!lyric){ if(line.trim()==='' && out.length && out[out.length-1]!=='' && !/^\[/.test(out[out.length-1])) out.push(''); continue; }
+    out.push(lyric);
+  }
+  while(out.length&&out[out.length-1]==='') out.pop();
+  out.push('','[End]');
+  return out.join('\n');
+}
+$('copySuno').onclick=()=>copy(exportSuno(),'Suno用の歌詞');
 
 // ---- 保存（PDF / 画像 / テキスト）----
 const libs={};
@@ -440,6 +536,7 @@ $('savePng').onclick=e=>doSave('png',e.currentTarget);
 $('saveTxt').onclick=e=>doSave('txt',e.currentTarget);
 
 $('title').value=st.title; ta.value=st.text;
+renderKeyUI();
 render();
 if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
 </script>
