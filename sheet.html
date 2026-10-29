@@ -54,6 +54,10 @@ textarea{min-height:340px;resize:vertical;font-family:var(--f-mono);font-size:14
 .chip small{font-size:10px;color:var(--muted)}
 .chip:hover{border-color:var(--chord)}
 .chip:active{background:var(--chord-soft)}
+.chip.util b{color:var(--ink)}
+.songbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.songbar select{flex:1;min-width:0;font-family:var(--f-body);font-weight:700;color:var(--ink)}
+.btn.danger{color:#b3261e;border-color:#b3261e}
 .chip.sec b{color:var(--ink);font-family:var(--f-body);font-weight:700;font-size:14px}
 .keyrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .keyrow .lbl{margin-right:2px}
@@ -132,8 +136,16 @@ select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
   <main id="main" data-view="edit">
     <section class="pane" id="editPane">
       <div>
+        <label class="lbl" for="songSel" id="songLbl">保存した曲</label>
+        <div class="songbar">
+          <select id="songSel"></select>
+          <button class="btn" id="songNew">＋ 新しい曲</button>
+          <button class="btn" id="songDel">削除</button>
+        </div>
+      </div>
+      <div>
         <label class="lbl" for="title">曲名</label>
-        <input type="text" id="title" autocomplete="off">
+        <input type="text" id="title" autocomplete="off" placeholder="曲名を入力">
       </div>
 
       <div class="keyrow">
@@ -161,7 +173,7 @@ select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 
       <div>
         <label class="lbl" for="src">歌詞＋コード</label>
-        <textarea id="src" spellcheck="false" autocapitalize="off"></textarea>
+        <textarea id="src" spellcheck="false" autocapitalize="off" placeholder="例）[C]歌詞を[G]ここに書く"></textarea>
       </div>
       <p class="hint"><code>[Am]</code> コード　<code># サビ</code> 構成の見出し（「構成」タブから挿入）　<code>[C][G][Am][F]</code> だけの行は進行表示<br>カポを付けて弾く形で入力するときは「入力カポ」を合わせると、譜面は実音のコードで出る</p>
     </section>
@@ -230,16 +242,37 @@ const SAMPLE=`# イントロ
 [Em]ありふれた朝を [Am]ふたりで[F]歩こう[G]`;
 
 const $=id=>document.getElementById(id);
-const st={title:'夜明けのバス停（サンプル）',text:SAMPLE,trans:0,capo:0,size:17};
-try{const s=JSON.parse(localStorage.getItem('chordnook-sheet')||'null'); if(s&&typeof s.text==='string') Object.assign(st,s);}catch(e){}
-const save=()=>{try{localStorage.setItem('chordnook-sheet',JSON.stringify(st))}catch(e){}};
+// ---- 曲ライブラリ（この端末に複数曲を保存）----
+const SONG_KEYS=['title','text','key','minor','inCapo','trans','capo'];
+const SONG_DEF={title:'',text:'',key:null,minor:false,inCapo:0,trans:0,capo:0};
+const newId=()=>'s'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+let lib=null;
+try{lib=JSON.parse(localStorage.getItem('chordnook-songs')||'null')}catch(e){}
+if(!lib||!lib.songs||!Object.keys(lib.songs).length){
+  let old=null; try{old=JSON.parse(localStorage.getItem('chordnook-sheet')||'null')}catch(e){}
+  const id=newId(), first=old&&typeof old.text==='string'?old:{title:'夜明けのバス停（サンプル）',text:SAMPLE};
+  const song={...SONG_DEF}; SONG_KEYS.forEach(k=>{if(first[k]!==undefined) song[k]=first[k]}); song.updated=Date.now();
+  lib={cur:id,songs:{[id]:song},prefs:{size:old&&old.size||17,ptab:old&&old.ptab||'dia'}};
+}
+if(!lib.songs[lib.cur]) lib.cur=Object.keys(lib.songs)[0];
+lib.prefs=lib.prefs||{};
+const st={...SONG_DEF,size:17,ptab:'dia',...lib.prefs,...lib.songs[lib.cur]};
+const writeLib=()=>{try{localStorage.setItem('chordnook-songs',JSON.stringify(lib))}catch(e){}};
+const save=()=>{
+  const s={}; SONG_KEYS.forEach(k=>s[k]=st[k]);
+  const prev=lib.songs[lib.cur]||{};
+  const changed=SONG_KEYS.some(k=>prev[k]!==s[k]);
+  s.updated=changed?Date.now():(prev.updated||Date.now());
+  lib.songs[lib.cur]=s; lib.prefs={size:st.size,ptab:st.ptab}; writeLib();
+};
 
 function detectKey(){
-  const m=st.text.match(/\[([^\]]+)\]/); if(!m) return {k:0,minor:false};
+  const m=st.text.match(/\[([A-G][^\]]*)\]/); if(!m) return {k:0,minor:false};
   const c=m[1].split('/')[0].match(NOTE_RE); if(!c) return {k:0,minor:false};
   return {k:idx(c[1],c[2]),minor:/^m(?!aj)/.test(c[3])};
 }
-if(typeof st.key!=='number'){const d=detectKey(); st.key=d.k; st.minor=d.minor;}
+function ensureKey(){ if(typeof st.key!=='number'){const d=detectKey(); st.key=d.k; st.minor=d.minor;} }
+ensureKey();
 if(!st.ptab) st.ptab='dia';
 if(typeof st.inCapo!=='number') st.inCapo=0;
 const srcKey=()=>({k:st.key,minor:!!st.minor,found:true});
@@ -346,7 +379,8 @@ function renderPalette(K){
     return;
   }
   const set=PAL[K.minor?'min':'maj'][g];
-  $('palette').innerHTML=set.map(spec=>{const c=chordName(k,f,spec);return `<button class="chip" data-ins="[${esc(c)}]"><b>${esc(pretty(c))}</b><small>${spec[4]}</small></button>`}).join('');
+  $('palette').innerHTML=set.map(spec=>{const c=chordName(k,f,spec);return `<button class="chip" data-ins="[${esc(c)}]"><b>${esc(pretty(c))}</b><small>${spec[4]}</small></button>`}).join('')
+    +`<button class="chip util" data-ins="[N.C.]"><b>N.C.</b><small>ノーコード</small></button>`;
 }
 
 // caret-safe insert
@@ -378,7 +412,40 @@ $('customBtn').addEventListener('click',()=>{const v=$('custom').value.trim(); i
 $('custom').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('customBtn').click()}});
 
 ta.addEventListener('input',()=>{st.text=ta.value;render()});
-$('title').addEventListener('input',e=>{st.title=e.target.value;render()});
+$('title').addEventListener('input',e=>{st.title=e.target.value;render();const o=$('songSel').selectedOptions[0];if(o)o.textContent=st.title||'無題の曲'});
+
+function renderSongs(){
+  const ids=Object.keys(lib.songs).sort((a,b)=>(lib.songs[b].updated||0)-(lib.songs[a].updated||0));
+  $('songSel').innerHTML=ids.map(id=>`<option value="${id}">${esc(lib.songs[id].title||'無題の曲')}</option>`).join('');
+  $('songSel').value=lib.cur;
+  $('songLbl').textContent=`保存した曲（${ids.length}曲）`;
+  resetDel();
+}
+function loadSong(id){
+  lib.cur=id; Object.assign(st,SONG_DEF,lib.songs[id]); ensureKey();
+  $('title').value=st.title; ta.value=st.text; caret=null;
+  renderKeyUI(); render(); renderSongs(); writeLib();
+}
+$('songSel').addEventListener('change',e=>loadSong(e.target.value));
+$('songNew').onclick=()=>{
+  const id=newId(); lib.songs[id]={...SONG_DEF,key:st.key,minor:st.minor,updated:Date.now()};
+  loadSong(id); setView('edit'); $('title').focus();
+  $('toast').textContent='新しい曲を作った';
+};
+let delTimer=null;
+function resetDel(){clearTimeout(delTimer);delTimer=null;$('songDel').textContent='削除';$('songDel').classList.remove('danger')}
+$('songDel').onclick=()=>{
+  if(!delTimer){ // 1回目のタップは確認だけ
+    $('songDel').textContent='もう一回押すと削除';$('songDel').classList.add('danger');
+    delTimer=setTimeout(resetDel,3000); return;
+  }
+  const name=st.title||'無題の曲';
+  delete lib.songs[lib.cur];
+  let ids=Object.keys(lib.songs).sort((a,b)=>(lib.songs[b].updated||0)-(lib.songs[a].updated||0));
+  if(!ids.length){const id=newId(); lib.songs[id]={...SONG_DEF,updated:Date.now()}; ids=[id];}
+  loadSong(ids[0]);
+  $('toast').textContent=`「${name}」を削除した`;
+};
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 $('tUp').onclick=()=>{st.trans=clamp(st.trans+1,-11,11);render()};
 $('tDown').onclick=()=>{st.trans=clamp(st.trans-1,-11,11);render()};
@@ -547,6 +614,7 @@ $('saveTxt').onclick=e=>doSave('txt',e.currentTarget);
 $('title').value=st.title; ta.value=st.text;
 renderKeyUI();
 render();
+renderSongs();
 if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
 </script>
 </body>
