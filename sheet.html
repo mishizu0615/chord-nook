@@ -110,10 +110,48 @@ select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
   --paper:#ffffff;--ink:#1b1e24;--muted:#6a7180;--line:#d8dce4;--chord:#0e6e66;--chord-soft:#d9efec;
   color-scheme:light;color:var(--ink);background:#fff}
 .exportbox .sheet{border:0;box-shadow:none;border-radius:0;padding:40px 44px}
+/* 音源タブ */
+main[data-view="audio"] #scorePane,main:not([data-view="audio"]) #audioPane{display:none}
+.apanel{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.astep{font-weight:700;display:flex;align-items:center;gap:8px}
+.astep b{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--chord);color:var(--paper);font-size:12px}
+.afile{color:var(--muted);font-size:13px;overflow-wrap:anywhere;min-width:0}
+.pbar{height:6px;background:var(--line);border-radius:3px;overflow:hidden}
+.pbar i{display:block;height:100%;width:0;background:var(--chord);transition:width .2s}
+.ameta{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.kbadge{font-family:var(--f-mono);font-weight:600;color:var(--chord);border:1px solid var(--chord);border-radius:999px;padding:2px 10px}
+.step button.txt{font-size:13px;font-weight:700;width:auto;padding:0 10px}
+.step button[disabled]{opacity:.35;cursor:not-allowed}
+.player{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.atime{font-family:var(--f-mono);font-variant-numeric:tabular-nums;color:var(--muted)}
+.anow{font-family:var(--f-mono);font-weight:600;font-size:28px;line-height:1;color:var(--chord);margin-left:auto;text-align:right}
+.bars{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-left:1.5px solid var(--line);border-top:1px solid var(--line)}
+.bar{border-right:1.5px solid var(--line);border-bottom:1px solid var(--line);padding:3px 4px 6px;min-width:0;display:flex;flex-direction:column;gap:1px}
+.bar .bn{font-size:10px;color:var(--muted);font-family:var(--f-mono)}
+.bar.on{background:var(--chord-soft)}
+.bar .cs{display:flex;flex-wrap:wrap;gap:2px}
+.cbtn{border:1px solid transparent;background:transparent;font-family:var(--f-mono);font-weight:600;font-size:14px;color:var(--chord);padding:2px 4px;border-radius:6px;cursor:pointer;min-width:0;overflow-wrap:anywhere;text-align:left}
+.cbtn:hover{border-color:var(--line)}
+.cbtn.cont{opacity:.4}
+.cbtn.ed{color:var(--ink);text-decoration:underline;text-decoration-color:var(--chord);text-underline-offset:3px}
+.cbtn.now{background:var(--chord);color:var(--paper);opacity:1}
+.cbtn.sel{border-color:var(--chord)}
+.cbtn:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.aedit{border:1px dashed var(--chord);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.aedit .ttl{font-size:13px;font-weight:700}
+.cue{border-radius:10px;background:var(--chord-soft);padding:12px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.cue small{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.06em}
+.cue-cur{font-size:18px;font-weight:700;overflow-wrap:anywhere}
+.cue-next{font-size:14px;color:var(--muted);overflow-wrap:anywhere}
+.btn.big{flex:1;padding:14px 10px;font-size:16px}
+@media (min-width:820px){
+  .tabs{display:flex;width:300px;margin-left:auto}
+  #tabEdit{display:none}
+}
 @media (max-width:819px){
   .tabs{display:flex}
   main{grid-template-columns:minmax(0,1fr)}
-  main[data-view="edit"] #scorePane,main[data-view="score"] #editPane{display:none}
+  main[data-view="edit"] #scorePane,main[data-view="edit"] #audioPane,main[data-view="score"] #editPane,main[data-view="audio"] #editPane{display:none}
   .sheet{padding:22px 16px 26px}
   textarea{min-height:300px}
 }
@@ -130,6 +168,7 @@ select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 
   <div class="tabs" role="tablist">
     <button id="tabEdit" role="tab" aria-selected="true">編集</button>
+    <button id="tabAudio" role="tab" aria-selected="false">音源</button>
     <button id="tabScore" role="tab" aria-selected="false">譜面</button>
   </div>
 
@@ -204,8 +243,69 @@ select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
       <div class="toast" id="toast" aria-live="polite"></div>
       <textarea id="fallback" hidden readonly></textarea>
     </section>
+    <section class="pane" id="audioPane">
+      <div class="apanel">
+        <div class="astep"><b>1</b>音源を読み込む</div>
+        <div class="row">
+          <label class="btn primary" for="aFile" id="aFileBtn">音源を選ぶ</label>
+          <input type="file" id="aFile" accept="audio/*,.mp3,.m4a,.wav,.aac" hidden>
+          <span class="afile" id="aName">まだ選んでないよ</span>
+        </div>
+        <div class="pbar" id="aProg" hidden><i></i></div>
+        <p class="hint">mp3・m4a・wavが使える。Sunoならボーカル抜きのステムを使うと精度が上がるよ。解析はこの端末の中だけでやるけぇ、音源はどこにも送られん</p>
+      </div>
+
+      <div class="apanel" id="aResult" hidden>
+        <div class="astep"><b>2</b>聴きながら確認・修正</div>
+        <div class="ameta">
+          <span class="kbadge" id="aKey"></span>
+          <div class="step"><span class="k">BPM</span><button class="txt" id="bpmHalf" aria-label="テンポを半分に">÷2</button><output id="aBpm"></output><button class="txt" id="bpmDbl" aria-label="テンポを倍に">×2</button></div>
+          <div class="step"><span class="k">小節の頭</span><button id="dnPrev" aria-label="1拍前へ">◀</button><button id="dnNext" aria-label="1拍後ろへ">▶</button></div>
+        </div>
+        <div class="player">
+          <button class="btn primary" id="aPlay">▶ 再生</button>
+          <span class="atime" id="aTime">0:00</span>
+          <span class="anow" id="aNow">—</span>
+        </div>
+        <p class="hint" id="aNoAudio" hidden>解析結果は保存してある。同じ音源を選び直すと再生できるよ</p>
+        <div class="bars" id="aBars"></div>
+        <div class="aedit" id="aEdit" hidden>
+          <div class="ttl" id="aEditTtl"></div>
+          <div class="palette" id="aAlts"></div>
+          <div class="row">
+            <input type="text" id="aCustom" placeholder="手入力（例: Cadd9）" autocomplete="off" autocapitalize="off">
+            <button class="btn" id="aCustomBtn">決定</button>
+            <button class="btn" id="aReset">解析結果に戻す</button>
+          </div>
+        </div>
+        <p class="hint">コードをタップすると、その位置から聴けて候補から直せる。下線は直したコード。BPMや小節の頭を変えると解析し直すけぇ、直したところは消えるよ</p>
+        <div class="out-actions"><button class="btn" id="aInsProg">進行だけ歌詞の最後に足す</button></div>
+      </div>
+
+      <div class="apanel" id="aAlign" hidden>
+        <div class="astep"><b>3</b>歌詞に合わせる</div>
+        <p class="hint">先に編集タブで歌詞を入れておいてね。「最初から再生」を押して、各行を歌い出した瞬間に「この行を歌い出した」を押す。間奏やイントロに入ったら「歌なし」を押す</p>
+        <div class="cue">
+          <small id="cueCount"></small>
+          <div class="cue-cur" id="cueCur"></div>
+          <div class="cue-next" id="cueNext"></div>
+        </div>
+        <div class="row">
+          <button class="btn primary big" id="mLine">この行を歌い出した</button>
+          <button class="btn big" id="mGap">歌なし</button>
+        </div>
+        <div class="row">
+          <button class="btn" id="mStart">最初から再生</button>
+          <button class="btn" id="mUndo">1つ戻す</button>
+          <button class="btn primary" id="mApply">歌詞に反映</button>
+          <button class="btn" id="mRevert" hidden>反映を取り消す</button>
+        </div>
+      </div>
+      <audio id="aAudio" preload="auto" hidden></audio>
+    </section>
   </main>
 </div>
+<script src="analyzer.js"></script>
 
 <script>
 const SH=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
@@ -243,8 +343,8 @@ const SAMPLE=`# イントロ
 
 const $=id=>document.getElementById(id);
 // ---- 曲ライブラリ（この端末に複数曲を保存）----
-const SONG_KEYS=['title','text','key','minor','inCapo','trans','capo'];
-const SONG_DEF={title:'',text:'',key:null,minor:false,inCapo:0,trans:0,capo:0};
+const SONG_KEYS=['title','text','key','minor','inCapo','trans','capo','ana','marks'];
+const SONG_DEF={title:'',text:'',key:null,minor:false,inCapo:0,trans:0,capo:0,ana:null,marks:[]};
 const newId=()=>'s'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 let lib=null;
 try{lib=JSON.parse(localStorage.getItem('chordnook-songs')||'null')}catch(e){}
@@ -422,9 +522,9 @@ function renderSongs(){
   resetDel();
 }
 function loadSong(id){
-  lib.cur=id; Object.assign(st,SONG_DEF,lib.songs[id]); ensureKey();
+  lib.cur=id; Object.assign(st,SONG_DEF,lib.songs[id]); ensureKey(); resetAudio();
   $('title').value=st.title; ta.value=st.text; caret=null;
-  renderKeyUI(); render(); renderSongs(); writeLib();
+  renderKeyUI(); render(); renderSongs(); renderAna(); writeLib();
 }
 $('songSel').addEventListener('change',e=>loadSong(e.target.value));
 $('songNew').onclick=()=>{
@@ -456,8 +556,16 @@ $('iDown').onclick=()=>{st.inCapo=clamp(st.inCapo-1,0,9);render()};
 $('sUp').onclick=()=>{st.size=clamp(st.size+1,12,30);render()};
 $('sDown').onclick=()=>{st.size=clamp(st.size-1,12,30);render()};
 
-function setView(v){$('main').dataset.view=v;$('tabEdit').setAttribute('aria-selected',v==='edit');$('tabScore').setAttribute('aria-selected',v==='score')}
-$('tabEdit').onclick=()=>setView('edit'); $('tabScore').onclick=()=>setView('score');
+const isWide=()=>matchMedia('(min-width:820px)').matches;
+function setView(v){
+  $('main').dataset.view=v;
+  $('tabEdit').setAttribute('aria-selected',v==='edit');
+  $('tabAudio').setAttribute('aria-selected',v==='audio');
+  $('tabScore').setAttribute('aria-selected',v==='score'||(v==='edit'&&isWide()));
+  if(v==='audio') renderCue();
+}
+$('tabEdit').onclick=()=>setView('edit'); $('tabScore').onclick=()=>setView('score'); $('tabAudio').onclick=()=>setView('audio');
+setView('edit');
 
 // text export (chord-over-lyric, 全角=2幅で揃える)
 const w=ch=>/[ᄀ-ᅟ⺀-꓏가-힣豈-﫿︰-﹏＀-｠￠-￦]/.test(ch)?2:1;
@@ -611,10 +719,233 @@ $('savePdf').onclick=e=>doSave('pdf',e.currentTarget);
 $('savePng').onclick=e=>doSave('png',e.currentTarget);
 $('saveTxt').onclick=e=>doSave('txt',e.currentTarget);
 
+// ---- 音源解析 ----
+const AN={F:null,url:null,raf:0,sel:-1,prevText:null,lastBar:-1};
+const au=$('aAudio'), CA=window.ChordAnalyzer;
+const fmtT=t=>{t=Math.max(0,t||0);return Math.floor(t/60)+':'+String(Math.floor(t%60)).padStart(2,'0')};
+const anaFlat=()=>st.ana?useFlat(st.ana.key.root,st.ana.key.minor):false;
+const chordStr=(r,q,b)=>{const f=anaFlat();return nm(r,f)+CA.QUALS[q]+(b!=null?'/'+nm(b,f):'')};
+const segName=s=>s.ov||(s.nc?'N.C.':chordStr(s.r,s.q,s.b));
+const forText=c=>transposeChord(c,-st.inCapo,useFlat(st.key,st.minor));
+
+function showProg(p,label){ $('aProg').hidden=p==null; if(p!=null) $('aProg').firstElementChild.style.width=Math.round(p*100)+'%'; if(label) $('aName').textContent=label; }
+function resetAudio(){
+  try{au.pause()}catch(e){}
+  if(AN.url){URL.revokeObjectURL(AN.url);AN.url=null}
+  au.removeAttribute('src'); AN.F=null; AN.sel=-1; AN.prevText=null; $('mRevert').hidden=true;
+  $('aName').textContent=st.ana&&st.ana.file?`前回: ${st.ana.file}`:'まだ選んでないよ';
+}
+function decode(buf){
+  const AC=window.AudioContext||window.webkitAudioContext, ctx=new AC();
+  return new Promise((ok,ng)=>{const p=ctx.decodeAudioData(buf,ok,ng); if(p&&p.then) p.then(ok,ng);}).finally(()=>{try{ctx.close()}catch(e){}});
+}
+function runWorker(chs,sr){
+  return new Promise((ok,ng)=>{
+    const w=new Worker('analyzer.js');
+    w.onmessage=m=>{const d=m.data; if(d.type==='progress') showProg(d.p); else if(d.type==='done'){w.terminate();ok(d.F)} else {w.terminate();ng(new Error(d.message))}};
+    w.onerror=e=>{w.terminate();ng(e)};
+    w.postMessage({channels:chs,sr},chs.map(c=>c.buffer));
+  });
+}
+function runLabel(period,phase,down,setKey){
+  const F=AN.F, beats=CA.makeBeats(period,phase,F.dur), L=CA.label(F,beats,{down});
+  const segs=L.segs.map(x=>{const o={t0:+x.t0.toFixed(3),t1:+x.t1.toFixed(3)}; if(x.nc) o.nc=1; else {o.r=x.r;o.q=x.q; if(x.b!=null)o.b=x.b; o.alts=x.alts;} return o;});
+  st.ana={file:st.ana&&st.ana.file||'',key:L.key,period,phase,down:L.down,dur:F.dur,segs};
+  if(setKey){st.key=mod(L.key.root-st.inCapo); st.minor=L.key.minor; renderKeyUI(); render();}
+  AN.sel=-1; AN.lastBar=-1; save(); renderAna();
+}
+$('aFile').addEventListener('change',async e=>{
+  const f=e.target.files&&e.target.files[0]; e.target.value=''; if(!f) return;
+  try{au.pause()}catch(er){}
+  if(AN.url) URL.revokeObjectURL(AN.url);
+  AN.url=URL.createObjectURL(f); au.src=AN.url;
+  // 同じ音源を選び直しただけなら、解析結果と修正はそのまま使う
+  if(st.ana&&st.ana.file===f.name&&!AN.F){ $('aName').textContent=f.name; renderAna(); $('toast').textContent='前回の解析結果で再生できるよ'; return; }
+  $('aFileBtn').setAttribute('aria-disabled','true');
+  showProg(0,'読み込み中…');
+  try{
+    const ab=await decode(await f.arrayBuffer());
+    const chs=[]; for(let c=0;c<Math.min(2,ab.numberOfChannels);c++) chs.push(ab.getChannelData(c).slice());
+    showProg(0.02,'解析中…');
+    AN.F=await runWorker(chs,ab.sampleRate);
+    const bt=CA.estimateBeats(AN.F);
+    st.ana={file:f.name};
+    runLabel(bt.period,bt.phase,null,true);
+    showProg(null,f.name);
+    $('toast').textContent='解析できた。再生しながら確認してね';
+  }catch(er){
+    showProg(null,'読み込めんかった');
+    $('toast').textContent='この音源は読めんかった。mp3かwavに書き出して、もう一回選んでね';
+  }finally{$('aFileBtn').removeAttribute('aria-disabled')}
+});
+
+function barList(){
+  const a=st.ana, nb=Math.ceil((a.dur-a.phase)/a.period), out=[];
+  for(let k=a.down>0?-1:0;;k++){
+    const i0=Math.max(0,a.down+4*k), i1=a.down+4*k+4; if(i0>=nb) break;
+    out.push({k,t0:k<0?0:a.phase+i0*a.period,t1:Math.min(a.dur,a.phase+i1*a.period)});
+  }
+  return out;
+}
+function renderAna(){
+  const a=st.ana, ok=!!(a&&a.segs);
+  $('aResult').hidden=!ok; $('aAlign').hidden=!ok;
+  if(!ok){ $('aName').textContent=AN.url?$('aName').textContent:'まだ選んでないよ'; return; }
+  $('aKey').textContent='Key '+pretty(nm(a.key.root,anaFlat())+(a.key.minor?'m':''));
+  $('aBpm').textContent=Math.round(60/a.period);
+  ['bpmHalf','bpmDbl','dnPrev','dnNext'].forEach(id=>$(id).disabled=!AN.F);
+  $('aPlay').disabled=!AN.url; $('aNoAudio').hidden=!!AN.url;
+  let html='';
+  for(const b of barList()){
+    const ss=[]; a.segs.forEach((sg,i)=>{ if(sg.t0<b.t1-0.01&&sg.t1>b.t0+0.01) ss.push(i); });
+    html+=`<div class="bar" data-t="${b.t0}"><span class="bn">${b.k<0?'弱起':b.k+1}</span><span class="cs">`+
+      ss.map(i=>{const sg=a.segs[i], cont=sg.t0<b.t0-0.05;
+        return `<button class="cbtn${cont?' cont':''}${sg.ov?' ed':''}${i===AN.sel?' sel':''}" data-i="${i}">${esc(pretty(segName(sg)))}</button>`}).join('')+`</span></div>`;
+  }
+  $('aBars').innerHTML=html;
+  renderEdit(); renderCue(); tick(true);
+}
+function renderEdit(){
+  const a=st.ana, i=AN.sel, sg=a&&a.segs[i];
+  $('aEdit').hidden=!sg; if(!sg) return;
+  const bar=barList().find(b=>sg.t0>=b.t0-0.01&&sg.t0<b.t1);
+  $('aEditTtl').textContent=`${bar?(bar.k<0?'弱起':bar.k+1+'小節目'):''} ${fmtT(sg.t0)}〜　今: ${segName(sg)}`;
+  const cands=[]; if(!sg.nc) cands.push(chordStr(sg.r,sg.q,sg.b));
+  (sg.alts||[]).forEach(x=>cands.push(chordStr(x[0],x[1],x[2])));
+  cands.push('N.C.');
+  $('aAlts').innerHTML=[...new Set(cands)].map(c=>`<button class="chip" data-c="${esc(c)}"><b>${esc(pretty(c))}</b></button>`).join('');
+  $('aCustom').value='';
+}
+function setOverride(c){
+  const sg=st.ana.segs[AN.sel]; if(!sg) return;
+  const auto=sg.nc?'N.C.':chordStr(sg.r,sg.q,sg.b);
+  if(!c||c===auto) delete sg.ov; else sg.ov=c;
+  save(); renderAna();
+}
+$('aBars').addEventListener('click',e=>{
+  const b=e.target.closest('.cbtn'); if(!b) return;
+  AN.sel=+b.dataset.i; const sg=st.ana.segs[AN.sel];
+  if(AN.url){ au.currentTime=sg.t0; }
+  renderAna();
+});
+$('aAlts').addEventListener('click',e=>{const b=e.target.closest('.chip'); if(b) setOverride(b.dataset.c)});
+$('aCustomBtn').onclick=()=>{const v=$('aCustom').value.trim().replace(/[\[\]]/g,''); if(v) setOverride(v)};
+$('aCustom').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('aCustomBtn').click()}});
+$('aReset').onclick=()=>setOverride(null);
+$('bpmDbl').onclick=()=>{const a=st.ana; runLabel(a.period/2,a.phase%(a.period/2),null,false)};
+$('bpmHalf').onclick=()=>{const a=st.ana; runLabel(a.period*2,a.phase,null,false)};
+$('dnPrev').onclick=()=>{const a=st.ana; runLabel(a.period,a.phase,(a.down+3)%4,false)};
+$('dnNext').onclick=()=>{const a=st.ana; runLabel(a.period,a.phase,(a.down+1)%4,false)};
+
+// 再生と現在位置の表示
+function tick(once){
+  const a=st.ana; if(!a||!a.segs) return;
+  const t=au.currentTime||0;
+  $('aTime').textContent=fmtT(t)+' / '+fmtT(a.dur);
+  const i=a.segs.findIndex(s=>t>=s.t0&&t<s.t1);
+  $('aNow').textContent=i>=0?pretty(segName(a.segs[i])):'—';
+  const bars=$('aBars').children; let cur=-1;
+  for(let k=0;k<bars.length;k++){ const t0=+bars[k].dataset.t, t1=k+1<bars.length?+bars[k+1].dataset.t:a.dur; if(t>=t0&&t<t1){cur=k;break} }
+  if(cur!==AN.lastBar||once){
+    for(const el of $('aBars').querySelectorAll('.bar.on')) el.classList.remove('on');
+    if(cur>=0){ bars[cur].classList.add('on'); if(!au.paused&&!once) bars[cur].scrollIntoView({block:'nearest'}); }
+    AN.lastBar=cur;
+  }
+  for(const el of $('aBars').querySelectorAll('.cbtn.now')) el.classList.remove('now');
+  if(cur>=0&&i>=0){ const el=bars[cur].querySelector(`.cbtn[data-i="${i}"]`); if(el) el.classList.add('now'); }
+  if(!au.paused&&!once) AN.raf=requestAnimationFrame(()=>tick());
+}
+au.addEventListener('play',()=>{$('aPlay').textContent='❚❚ 一時停止';cancelAnimationFrame(AN.raf);tick()});
+au.addEventListener('pause',()=>{$('aPlay').textContent='▶ 再生';cancelAnimationFrame(AN.raf);tick(true)});
+au.addEventListener('seeked',()=>tick(true));
+$('aPlay').onclick=()=>{ if(!AN.url) return; if(au.paused) au.play().catch(()=>{}); else au.pause(); };
+
+// 進行だけ足す
+function barChords(b){
+  return st.ana.segs.filter(s=>s.t0<b.t1-0.01&&s.t1>b.t0+0.01).map(segName);
+}
+$('aInsProg').onclick=()=>{
+  const bars=barList(), lines=[];
+  for(let i=0;i<bars.length;i+=4) lines.push(bars.slice(i,i+4).map(b=>barChords(b).map(c=>'['+forText(c)+']').join('')).join(''));
+  AN.prevText=st.text;
+  ta.value=st.text.replace(/\s+$/,'')+(st.text.trim()?'\n\n':'')+'# 解析した進行\n'+lines.join('\n');
+  st.text=ta.value; render(); $('mRevert').hidden=false;
+  $('toast').textContent='進行を歌詞の最後に足した';
+};
+
+// 歌詞合わせ
+const isProgLine=l=>{const s=parseLine(l);return s.some(x=>x.c!==null)&&s.every(x=>!x.t.trim())};
+function lyricIdx(){ const L=[]; st.text.split('\n').forEach((l,i)=>{ if(l.trim()&&!/^#/.test(l)&&!isProgLine(l)) L.push(i) }); return L; }
+function renderCue(){
+  if($('aAlign').hidden) return;
+  const lines=st.text.split('\n'), L=lyricIdx(), m=st.marks||[];
+  const ptr=m.filter(x=>x.l>=0).length, last=m[m.length-1];
+  const clean=i=>lines[L[i]].replace(/\[[^\]]*\]/g,'');
+  if(!L.length){ $('cueCount').textContent='歌詞がまだないよ'; $('cueCur').textContent='編集タブで歌詞を入れてね'; $('cueNext').textContent=''; return; }
+  $('cueCount').textContent=`${ptr} / ${L.length} 行`;
+  $('cueCur').textContent=last?(last.l>=0?'♪ '+clean(last.l):'（歌なし）'):'まだ始めてないよ';
+  $('cueNext').textContent=ptr<L.length?'次: '+clean(ptr):'これで最後の行';
+  $('mLine').disabled=ptr>=L.length; $('mUndo').disabled=!m.length; $('mApply').disabled=!m.length;
+}
+const nowT=()=>Math.max(0,(au.currentTime||0)-0.15);
+function addMark(l){
+  if(!AN.url){ $('toast').textContent='先に音源を選んでね'; return; }
+  if(au.paused) au.play().catch(()=>{});
+  st.marks=[...(st.marks||[]),{t:+nowT().toFixed(3),l}]; save(); renderCue();
+}
+$('mLine').onclick=()=>addMark((st.marks||[]).filter(x=>x.l>=0).length);
+$('mGap').onclick=()=>addMark(-1);
+$('mUndo').onclick=()=>{ st.marks=(st.marks||[]).slice(0,-1); save(); renderCue(); };
+$('mStart').onclick=()=>{ if(!AN.url){ $('toast').textContent='先に音源を選んでね'; return; } st.marks=[]; save(); au.currentTime=0; au.play().catch(()=>{}); renderCue(); };
+function chordsIn(a,b){
+  const S=st.ana.segs, h=0.3*st.ana.period, out=[];
+  const act=S.find(s=>s.t0<=a+h&&s.t1>a); if(act) out.push({t:a,c:segName(act)});
+  for(const s of S) if(s.t0>a+h&&s.t0<b-h) out.push({t:s.t0,c:segName(s)});
+  return out;
+}
+function applyMarks(){
+  const lines=st.text.split('\n'), L=lyricIdx(), mk=[...(st.marks||[])].sort((x,y)=>x.t-y.t);
+  const replace={}, before={}, end=[];
+  const prog=cs=>{const n=cs.map(x=>'['+forText(x.c)+']'), o=[]; for(let i=0;i<n.length;i+=8) o.push(n.slice(i,i+8).join('')); return o;};
+  const addBefore=(ord,arr)=>{
+    if(!arr.length) return;
+    if(ord==null||L[ord]==null){ end.push(...arr); return; }
+    const li=L[ord]; let k=li-1; while(k>=0&&!lines[k].trim()) k--;
+    const at=(k>=0&&/^#/.test(lines[k]))?k:li; (before[at]=before[at]||[]).push(...arr,'');
+  };
+  const nextLine=k=>{for(let j=k+1;j<mk.length;j++) if(mk[j].l>=0) return mk[j].l; return null;};
+  if(mk.length&&mk[0].t>0.5) addBefore(mk[0].l>=0?mk[0].l:nextLine(0),prog(chordsIn(0,mk[0].t)));
+  mk.forEach((m,k)=>{
+    const a=m.t, b=k+1<mk.length?mk[k+1].t:st.ana.dur, cs=chordsIn(a,b);
+    if(m.l<0){ addBefore(nextLine(k),prog(cs)); return; }
+    const li=L[m.l]; if(li==null) return;
+    const chars=Array.from(lines[li].replace(/\[[^\]]*\]/g,'')), n=chars.length, ins=[]; let last=0;
+    for(const x of cs){ let p=Math.round((x.t-a)/Math.max(0.01,b-a)*n); p=Math.max(last,Math.min(n,p)); ins.push([p,forText(x.c)]); last=p; }
+    let o='',pi=0; for(let i=0;i<=n;i++){ while(pi<ins.length&&ins[pi][0]===i){o+='['+ins[pi][1]+']';pi++} if(i<n) o+=chars[i]; }
+    replace[li]=o;
+  });
+  const out=[]; lines.forEach((l,i)=>{ if(before[i]) out.push(...before[i]); if(isProgLine(l)) return; out.push(replace[i]!=null?replace[i]:l); });
+  if(end.length){ while(out.length&&!out[out.length-1].trim()) out.pop(); out.push('',...end); }
+  return out.join('\n').replace(/\n{3,}/g,'\n\n');
+}
+$('mApply').onclick=()=>{
+  if(!st.ana||!(st.marks||[]).length) return;
+  AN.prevText=st.text; ta.value=applyMarks(); st.text=ta.value; render(); renderCue();
+  $('mRevert').hidden=false; $('toast').textContent='歌詞にコードを入れた。譜面タブで確認してね';
+};
+$('mRevert').onclick=()=>{
+  if(AN.prevText==null) return;
+  ta.value=AN.prevText; st.text=ta.value; AN.prevText=null; render(); renderCue();
+  $('mRevert').hidden=true; $('toast').textContent='反映を取り消した';
+};
+ta.addEventListener('input',()=>renderCue());
+
 $('title').value=st.title; ta.value=st.text;
 renderKeyUI();
 render();
 renderSongs();
+resetAudio();
+renderAna();
 if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
 </script>
 </body>
