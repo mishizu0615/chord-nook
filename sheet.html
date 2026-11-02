@@ -144,6 +144,16 @@ main[data-view="audio"] #scorePane,main:not([data-view="audio"]) #audioPane{disp
 .cue-cur{font-size:18px;font-weight:700;overflow-wrap:anywhere}
 .cue-next{font-size:14px;color:var(--muted);overflow-wrap:anywhere}
 .btn.big{flex:1;padding:14px 10px;font-size:16px}
+/* 歌詞合わせ中は操作パネルを画面下に固定 */
+#aAlign.docked{position:fixed;left:0;right:0;bottom:0;z-index:20;margin:0 auto;max-width:760px;gap:8px;
+  border-radius:14px 14px 0 0;border-bottom:0;box-shadow:0 -10px 30px rgba(10,30,40,.22);
+  padding:12px max(16px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+#aAlign.docked .astep,#aAlign.docked .hint,#aAlign.docked #mStart,#aAlign.docked #mRevert{display:none}
+#aAlign.docked .cue{padding:8px 12px}
+#aAlign.docked .cue-cur{font-size:16px}
+#aAlign:not(.docked) #mEnd,#aAlign:not(.docked) #mPlay{display:none}
+body.aligning .wrap{padding-bottom:300px}
+body.aligning .bar{scroll-margin-bottom:300px}
 @media (min-width:820px){
   .tabs{display:flex;width:300px;margin-left:auto}
   #tabEdit{display:none}
@@ -296,9 +306,11 @@ main[data-view="audio"] #scorePane,main:not([data-view="audio"]) #audioPane{disp
         </div>
         <div class="row">
           <button class="btn" id="mStart">最初から再生</button>
+          <button class="btn" id="mPlay">❚❚</button>
           <button class="btn" id="mUndo">1つ戻す</button>
           <button class="btn primary" id="mApply">歌詞に反映</button>
           <button class="btn" id="mRevert" hidden>反映を取り消す</button>
+          <button class="btn" id="mEnd">閉じる</button>
         </div>
       </div>
       <audio id="aAudio" preload="auto" hidden></audio>
@@ -563,6 +575,7 @@ function setView(v){
   $('tabAudio').setAttribute('aria-selected',v==='audio');
   $('tabScore').setAttribute('aria-selected',v==='score'||(v==='edit'&&isWide()));
   if(v==='audio') renderCue();
+  try{ setDock(AN.aligning) }catch(e){}
 }
 $('tabEdit').onclick=()=>setView('edit'); $('tabScore').onclick=()=>setView('score'); $('tabAudio').onclick=()=>setView('audio');
 setView('edit');
@@ -720,7 +733,7 @@ $('savePng').onclick=e=>doSave('png',e.currentTarget);
 $('saveTxt').onclick=e=>doSave('txt',e.currentTarget);
 
 // ---- 音源解析 ----
-const AN={F:null,url:null,raf:0,sel:-1,prevText:null,lastBar:-1};
+const AN={F:null,url:null,raf:0,sel:-1,prevText:null,lastBar:-1,aligning:false};
 const au=$('aAudio'), CA=window.ChordAnalyzer;
 const fmtT=t=>{t=Math.max(0,t||0);return Math.floor(t/60)+':'+String(Math.floor(t%60)).padStart(2,'0')};
 const anaFlat=()=>st.ana?useFlat(st.ana.key.root,st.ana.key.minor):false;
@@ -730,7 +743,7 @@ const forText=c=>transposeChord(c,-st.inCapo,useFlat(st.key,st.minor));
 
 function showProg(p,label){ $('aProg').hidden=p==null; if(p!=null) $('aProg').firstElementChild.style.width=Math.round(p*100)+'%'; if(label) $('aName').textContent=label; }
 function resetAudio(){
-  try{au.pause()}catch(e){}
+  try{au.pause()}catch(e){} if(typeof setDock==='function') setDock(false);
   if(AN.url){URL.revokeObjectURL(AN.url);AN.url=null}
   au.removeAttribute('src'); AN.F=null; AN.sel=-1; AN.prevText=null; $('mRevert').hidden=true;
   $('aName').textContent=st.ana&&st.ana.file?`前回: ${st.ana.file}`:'まだ選んでないよ';
@@ -888,15 +901,24 @@ function renderCue(){
   $('mLine').disabled=ptr>=L.length; $('mUndo').disabled=!m.length; $('mApply').disabled=!m.length;
 }
 const nowT=()=>Math.max(0,(au.currentTime||0)-0.15);
+function setDock(on){
+  AN.aligning=!!on;
+  const show=AN.aligning&&$('main').dataset.view==='audio';
+  $('aAlign').classList.toggle('docked',show); document.body.classList.toggle('aligning',show);
+}
+$('mPlay').onclick=()=>{ if(au.paused) au.play().catch(()=>{}); else au.pause(); };
+au.addEventListener('play',()=>{$('mPlay').textContent='❚❚'});
+au.addEventListener('pause',()=>{$('mPlay').textContent='▶'});
+$('mEnd').onclick=()=>{ try{au.pause()}catch(e){} setDock(false); };
 function addMark(l){
   if(!AN.url){ $('toast').textContent='先に音源を選んでね'; return; }
   if(au.paused) au.play().catch(()=>{});
-  st.marks=[...(st.marks||[]),{t:+nowT().toFixed(3),l}]; save(); renderCue();
+  st.marks=[...(st.marks||[]),{t:+nowT().toFixed(3),l}]; save(); renderCue(); setDock(true);
 }
 $('mLine').onclick=()=>addMark((st.marks||[]).filter(x=>x.l>=0).length);
 $('mGap').onclick=()=>addMark(-1);
 $('mUndo').onclick=()=>{ st.marks=(st.marks||[]).slice(0,-1); save(); renderCue(); };
-$('mStart').onclick=()=>{ if(!AN.url){ $('toast').textContent='先に音源を選んでね'; return; } st.marks=[]; save(); au.currentTime=0; au.play().catch(()=>{}); renderCue(); };
+$('mStart').onclick=()=>{ if(!AN.url){ $('toast').textContent='先に音源を選んでね'; return; } st.marks=[]; save(); au.currentTime=0; au.play().catch(()=>{}); renderCue(); setDock(true); };
 function chordsIn(a,b){
   const S=st.ana.segs, h=0.3*st.ana.period, out=[];
   const act=S.find(s=>s.t0<=a+h&&s.t1>a); if(act) out.push({t:a,c:segName(act)});
@@ -931,6 +953,7 @@ function applyMarks(){
 $('mApply').onclick=()=>{
   if(!st.ana||!(st.marks||[]).length) return;
   AN.prevText=st.text; ta.value=applyMarks(); st.text=ta.value; render(); renderCue();
+  setDock(false); try{au.pause()}catch(e){}
   $('mRevert').hidden=false; $('toast').textContent='歌詞にコードを入れた。譜面タブで確認してね';
 };
 $('mRevert').onclick=()=>{
